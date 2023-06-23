@@ -9,8 +9,10 @@ end
 
 struct Period
     value::Float64
-    Period(value) = value > 0.0 ? new(value) : error("Period must be positive")
-    Period() = new(0.0)
+    atTime::Float64
+    Period(value,time) = value > 0.0 ? new(value, time) : error("Period must be positive")
+    Period(value) = value > 0.0 ? new(value, 0.0) : error("Period must be positive")
+    Period() = new(0.0, 0.0)
 end
 
 struct LightCurveProperties
@@ -44,6 +46,9 @@ mutable struct LightCurve
     LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}) = new(LightCurveProperties(length(time), time, signal), Period(), LightCurvePhase(length(time)))
     LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}, signalError::AbstractVector{Float64}) = new(LightCurveProperties(length(time), time, signal, signalError), Period(), LightCurvePhase(length(time)))
     LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}, period::Float64) = new(LightCurveProperties(length(time), time, signal), Period(period), LightCurvePhase(length(time)))
+    LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}, signalError::AbstractVector{Float64}, period::Float64) = new(LightCurveProperties(length(time), time, signal, signalError), Period(period), LightCurvePhase(length(time)))
+    LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}, period::Float64, periodAtTime::Float64) = new(LightCurveProperties(length(time), time, signal), Period(period, periodAtTime), LightCurvePhase(length(time)))
+    LightCurve(time::AbstractVector{Float64}, signal::AbstractVector{Float64}, signalError::AbstractVector{Float64}, period::Float64, periodAtTime::Float64) = new(LightCurveProperties(length(time), time, signal, signalError), Period(period, periodAtTime), LightCurvePhase(length(time)))
 end
 
 

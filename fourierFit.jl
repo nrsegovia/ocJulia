@@ -88,3 +88,7 @@ function evalFour(X,F::fourierFit)
     end
     return out
 end
+
+function residualsFour(times::AbstractVector{Float64}, signal::AbstractVector{Float64}, F::fourierFit)
+    return sum(abs.(signal - evalFour(times, F)))
+end
