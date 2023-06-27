@@ -2,6 +2,7 @@ using CSV
 using DataFrames
 using Plots
 using LeastSquaresOptim
+using BSplineKit
 include("lightCurve.jl")
 include("fourierFit.jl")
 
@@ -67,6 +68,20 @@ function binEdgesToPairs(binEdges::AbstractVector{Float64}, periodAtTime::Float6
     return pairs, periodIdx
 end
 
+struct ocResult
+    representativeTimes::AbstractVector{Float64}
+    computedOC::AbstractVector{Float64}
+    uncertaintyOC::AbstractVector{Float64}
+    interpolate
+
+    ocResult(representativeTimes::AbstractVector{Float64}, computedOC::AbstractVector{Float64}, uncertaintyOC::AbstractVector{Float64}) = new(representativeTimes, computedOC, uncertaintyOC, extrapolate(interpolate(representativeTimes, computedOC, BSplineOrder(4), Natural()), Smooth()))
+end
+
+function exportOCasCSV(oc::ocResult, path::String)
+    df = DataFrame(HJD = oc.representativeTimes, OC = oc.computedOC)
+    CSV.write(path, df)
+end 
+
 
 function runOC(baseInfo::ocBase, numberBootstrap::Int)
     # Add bootstrap!
@@ -77,9 +92,9 @@ function runOC(baseInfo::ocBase, numberBootstrap::Int)
     allTimes = baseInfo.allData.properties.time
     allMags = baseInfo.allData.properties.signal
     period = baseInfo.allData.period.value
-    representativeTimeValues = []
-    computedOC = []
-    uncertaintyOC = []
+    representativeTimeValues = Float64[]
+    computedOC = Float64[]
+    uncertaintyOC = Float64[]
     idxPrev = orderedIndxs[1]
     ocFirstResult = 0.0
     ocPrev = 0.0 # Works as initial guess
@@ -95,9 +110,13 @@ function runOC(baseInfo::ocBase, numberBootstrap::Int)
         # maybe set 10 as variable instead of fixed value
         if nPoints >= 10
             magSubSet = allMags[edgeMask]
-            push!(representativeTimeValues, median(timeSubSet))
+            medianTime = median(timeSubSet)
+            timeDifference = length(representativeTimeValues) > 0 ? abs(medianTime - representativeTimeValues[end]) : baseInfo.allData.period.atTime
+            nCycles = timeDifference/period
+            maxOptimizerJump = nCycles * 5e-4
+            push!(representativeTimeValues, medianTime)
             toBeMinimized(oc) = residualsFour((timeSubSet .- oc[1])/period, magSubSet, baseInfo.template)
-            minimizing = optimize(toBeMinimized, [ocPrev], LevenbergMarquardt())
+            minimizing = optimize(toBeMinimized, [ocPrev], LevenbergMarquardt(), lower = ocPrev - maxOptimizerJump, upper = ocPrev + maxOptimizerJump)
             result = minimizing.minimizer[1]
             if firstPass
                 ocFirstResult = result
@@ -107,5 +126,7 @@ function runOC(baseInfo::ocBase, numberBootstrap::Int)
             ocPrev = result
         end
     end
-    return(representativeTimeValues, computedOC, uncertaintyOC)
+    toSort = sortperm(representativeTimeValues)
+    return(ocResult(representativeTimeValues[toSort], computedOC[toSort], uncertaintyOC))
 end
+
